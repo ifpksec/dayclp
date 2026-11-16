@@ -54,7 +54,7 @@ jobs:
           python main.py
       - name: Publish
         run: |
-          cp ui/index.html site/
+          cp ui/index.html ui/favicon.svg site/
           touch site/.nojekyll
           cd site
           git init -q -b gh-pages
