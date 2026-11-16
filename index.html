@@ -1,0 +1,92 @@
+<!doctype html>
+<html lang="ko">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>dayclp 영상 갤러리</title>
+<style>
+:root{--bg:#f6f7f9;--fg:#15181d;--mut:#5d6672;--card:#fff;--line:#e2e5ea;--acc:#0a5fd8}
+@media (prefers-color-scheme:dark){:root{--bg:#0f1216;--fg:#e8ebef;--mut:#98a2ae;--card:#181c22;--line:#2a3039;--acc:#6aa5ff}}
+*{box-sizing:border-box}
+body{margin:0;background:var(--bg);color:var(--fg);font:15px/1.5 system-ui,-apple-system,"Segoe UI",sans-serif}
+header{max-width:1100px;margin:0 auto;padding:24px 16px 8px}
+h1{margin:0;font-size:22px}
+header p{margin:4px 0 0;color:var(--mut)}
+main{max-width:1100px;margin:0 auto;padding:8px 16px 40px}
+.grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(240px,1fr));gap:16px}
+.card{background:var(--card);border:1px solid var(--line);border-radius:12px;overflow:hidden;display:flex;flex-direction:column}
+.card video{width:100%;aspect-ratio:9/16;background:#000;display:block;object-fit:contain}
+.body{padding:12px;display:flex;flex-direction:column;gap:6px;flex:1}
+.title{font-weight:600}
+.meta{color:var(--mut);font-size:13px}
+.cap{font-size:13px}
+.row{display:flex;gap:8px;margin-top:auto;padding-top:6px}
+.btn{flex:1;text-align:center;padding:8px;border:1px solid var(--line);border-radius:8px;background:transparent;color:var(--acc);font:inherit;font-size:14px;cursor:pointer;text-decoration:none}
+.btn:hover{border-color:var(--acc)}
+.pager{display:flex;justify-content:center;align-items:center;gap:12px;margin-top:24px}
+.pager .btn{flex:none;min-width:84px}
+.btn[disabled]{opacity:.4;cursor:default}
+.empty{padding:60px 0;text-align:center;color:var(--mut)}
+.toast{position:fixed;left:50%;bottom:24px;transform:translateX(-50%);background:var(--fg);color:var(--bg);padding:8px 14px;border-radius:8px;font-size:14px;opacity:0;transition:opacity .2s;pointer-events:none}
+.toast.on{opacity:1}
+</style>
+</head>
+<body>
+<header>
+<h1>dayclp</h1>
+<p>한국재무설계협회 30초 영상 · 매일 새 영상이 올라옵니다</p>
+</header>
+<main>
+<div id="grid" class="grid"></div>
+<div id="pager" class="pager"></div>
+</main>
+<div id="toast" class="toast"></div>
+<script>
+const PER=12;
+const grid=document.getElementById('grid'),pager=document.getElementById('pager'),toast=document.getElementById('toast');
+let items=[],page=1;
+function abs(p){return new URL(p,location.href).href}
+function say(t){toast.textContent=t;toast.classList.add('on');setTimeout(()=>toast.classList.remove('on'),1600)}
+async function copy(text){
+  try{await navigator.clipboard.writeText(text);say('링크를 복사했습니다')}
+  catch(e){const a=document.createElement('textarea');a.value=text;document.body.appendChild(a);a.select();try{document.execCommand('copy');say('링크를 복사했습니다')}catch(_){say('복사하지 못했습니다')}a.remove()}
+}
+function el(tag,cls,text){const e=document.createElement(tag);if(cls)e.className=cls;if(text!=null)e.textContent=text;return e}
+function card(it){
+  const c=el('div','card');c.id=it.id;
+  const v=document.createElement('video');
+  v.controls=true;v.preload='none';v.playsInline=true;v.poster=it.poster;v.src=it.video;
+  v.addEventListener('play',()=>document.querySelectorAll('video').forEach(o=>{if(o!==v)o.pause()}));
+  c.appendChild(v);
+  const b=el('div','body');
+  b.appendChild(el('div','title',it.title));
+  b.appendChild(el('div','meta',it.ts.replace('T',' ').slice(0,16)+' · '+it.category));
+  if(it.caption)b.appendChild(el('div','cap',it.caption));
+  const row=el('div','row');
+  const dl=el('a','btn','다운로드');dl.href=it.video;dl.download=it.id+'.mp4';
+  const cp=el('button','btn','링크 복사');cp.type='button';
+  cp.onclick=()=>copy(abs(it.video));
+  row.append(dl,cp);b.appendChild(row);c.appendChild(b);return c;
+}
+function render(){
+  grid.replaceChildren();
+  const pages=Math.max(1,Math.ceil(items.length/PER));
+  page=Math.min(Math.max(1,page),pages);
+  if(!items.length){grid.appendChild(el('div','empty','아직 영상이 없습니다'))}
+  items.slice((page-1)*PER,page*PER).forEach(it=>grid.appendChild(card(it)));
+  pager.replaceChildren();
+  if(pages>1){
+    const prev=el('button','btn','이전');prev.disabled=page<=1;prev.onclick=()=>go(page-1);
+    const next=el('button','btn','다음');next.disabled=page>=pages;next.onclick=()=>go(page+1);
+    pager.append(prev,el('span','meta',page+' / '+pages),next);
+  }
+}
+function go(p){page=p;history.replaceState(null,'','?page='+p);render();window.scrollTo(0,0)}
+fetch('data/videos.json',{cache:'no-cache'}).then(r=>r.json()).then(d=>{
+  items=d.sort((a,b)=>b.ts.localeCompare(a.ts));
+  page=parseInt(new URLSearchParams(location.search).get('page')||'1',10)||1;
+  render();
+}).catch(()=>{grid.appendChild(el('div','empty','목록을 불러오지 못했습니다'))});
+</script>
+</body>
+</html>
