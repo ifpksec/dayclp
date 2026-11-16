@@ -9,6 +9,10 @@ on:
         description: stop after this step (empty runs everything)
         required: false
         default: ''
+      clips:
+        description: number of clips to generate (empty means all)
+        required: false
+        default: ''
       avoid:
         description: topics to avoid, separated by |
         required: false
@@ -60,6 +64,7 @@ jobs:
           WORK_DIR: ${{ runner.temp }}/work
           DAYCLP_STOP_AFTER: ${{ inputs.stop_after }}
           DAYCLP_AVOID: ${{ inputs.avoid }}
+          DAYCLP_CLIPS: ${{ inputs.clips }}
         run: |
           git rev-parse HEAD
           python main.py
