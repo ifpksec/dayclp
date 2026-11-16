@@ -26,6 +26,14 @@ main{max-width:1100px;margin:0 auto;padding:8px 16px 40px}
 .pager{display:flex;justify-content:center;align-items:center;gap:12px;margin-top:24px}
 .pager .btn{flex:none;min-width:84px}
 .btn[disabled]{opacity:.4;cursor:default}
+.mk{border-top:1px solid var(--line);font-size:13px}
+.mk summary{padding:10px 12px;cursor:pointer;color:var(--acc)}
+.mk .in{padding:0 12px 12px;display:flex;flex-direction:column;gap:10px}
+.mk h4{margin:0 0 2px;font-size:13px}
+.mk ul{margin:0;padding-left:18px}
+.mk img{width:48%;border-radius:8px;border:1px solid var(--line)}
+.imgs{display:flex;gap:8px}
+.mut{color:var(--mut)}
 .empty{padding:60px 0;text-align:center;color:var(--mut)}
 .toast{position:fixed;left:50%;bottom:24px;transform:translateX(-50%);background:var(--fg);color:var(--bg);padding:8px 14px;border-radius:8px;font-size:14px;opacity:0;transition:opacity .2s;pointer-events:none}
 .toast.on{opacity:1}
@@ -52,6 +60,32 @@ async function copy(text){
   catch(e){const a=document.createElement('textarea');a.value=text;document.body.appendChild(a);a.select();try{document.execCommand('copy');say('링크를 복사했습니다')}catch(_){say('복사하지 못했습니다')}a.remove()}
 }
 function el(tag,cls,text){const e=document.createElement(tag);if(cls)e.className=cls;if(text!=null)e.textContent=text;return e}
+function sec(parent,title){const d=el('div');d.appendChild(el('h4',null,title));parent.appendChild(d);return d}
+function list(parent,rows){const u=el('ul');rows.forEach(r=>u.appendChild(el('li',null,r)));parent.appendChild(u)}
+function making(m){
+  const d=el('details','mk');d.appendChild(el('summary',null,'메이킹 과정'));
+  const w=el('div','in');
+  if(m.topic){
+    const s=sec(w,'1. 소재 선정');
+    s.appendChild(el('div',null,'['+m.topic.category+'] '+m.topic.title));
+    if(m.topic.angle)s.appendChild(el('div','mut',m.topic.angle));
+    if(m.topic_candidates)list(s,m.topic_candidates.map(c=>c.votes+'표 · '+c.title+(c.by?' ('+c.by+')':'')));
+  }
+  if(m.board){
+    const s=sec(w,'2. 콘티');
+    s.appendChild(el('div',null,m.board.title+' · '+m.board.pov+'/'+m.board.subject+(m.board.narration_only?' · 나레이션':'')));
+    s.appendChild(el('div','mut','톤: '+m.board.tone));
+    if(m.board_candidates)list(s,m.board_candidates.map(c=>c.votes+'표 · '+c.title+(c.by?' ('+c.by+')':'')));
+    if(m.board.characters&&m.board.characters.length){const c=sec(w,'등장인물');list(c,m.board.characters.map(x=>x.name+': '+x.desc))}
+  }
+  if(m.profile_image||m.keyframe_image){
+    const s=sec(w,'3. 이미지');const r=el('div','imgs');
+    [[m.profile_image,'프로필'+(m.profile_service?' · '+m.profile_service:'')],[m.keyframe_image,'키프레임'+(m.keyframe_service?' · '+m.keyframe_service:'')]].forEach(([u,t])=>{if(!u)return;const f=el('div');const i=document.createElement('img');i.src=u;i.loading='lazy';i.alt=t;f.append(i,el('div','mut',t));r.appendChild(f)});
+    s.appendChild(r);
+  }
+  if(m.board){const s=sec(w,'4. 클립과 대본'+(m.script_service?' · '+m.script_service:''));list(s,m.board.clips.map(c=>c.n+'. '+c.visual+' — “'+c.script+'”'))}
+  d.appendChild(w);return d;
+}
 function card(it){
   const c=el('div','card');c.id=it.id;
   const v=document.createElement('video');
@@ -66,7 +100,9 @@ function card(it){
   const dl=el('a','btn','다운로드');dl.href=it.video;dl.download=it.id+'.mp4';
   const cp=el('button','btn','링크 복사');cp.type='button';
   cp.onclick=()=>copy(abs(it.video));
-  row.append(dl,cp);b.appendChild(row);c.appendChild(b);return c;
+  row.append(dl,cp);b.appendChild(row);c.appendChild(b);
+  if(it.making)c.appendChild(making(it.making));
+  return c;
 }
 function render(){
   grid.replaceChildren();
