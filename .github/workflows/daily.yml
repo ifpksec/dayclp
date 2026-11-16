@@ -4,6 +4,11 @@ on:
   schedule:
     - cron: '0 21 * * *'
   workflow_dispatch:
+    inputs:
+      stop_after:
+        description: stop after this step (empty runs everything)
+        required: false
+        default: ''
 
 permissions:
   contents: write
@@ -49,12 +54,13 @@ jobs:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
           SITE_DIR: ${{ github.workspace }}/site
           WORK_DIR: ${{ runner.temp }}/work
+          DAYCLP_STOP_AFTER: ${{ inputs.stop_after }}
         run: |
           git rev-parse HEAD
           python main.py
       - name: Publish
         run: |
-          rm -rf site/live
+          if [ -z "${{ inputs.stop_after }}" ]; then rm -rf site/live; fi
           cp ui/index.html ui/favicon.svg site/
           touch site/.nojekyll
           cd site
