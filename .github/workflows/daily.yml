@@ -46,6 +46,7 @@ jobs:
         env:
           WA_BASE: ${{ secrets.WA_BASE }}
           WA_KEY: ${{ secrets.WA_KEY }}
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
           SITE_DIR: ${{ github.workspace }}/site
           WORK_DIR: ${{ runner.temp }}/work
         run: |
@@ -53,7 +54,7 @@ jobs:
           python main.py
       - name: Publish
         run: |
-          cp ui/index.html ui/config.js site/
+          cp ui/index.html site/
           touch site/.nojekyll
           cd site
           git init -q -b gh-pages

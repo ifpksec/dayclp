@@ -57,8 +57,6 @@ main{max-width:1100px;margin:0 auto;padding:8px 16px 40px}
 <div id="pager" class="pager"></div>
 </main>
 <div id="toast" class="toast"></div>
-<script src="config.js"></script>
-<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2.45.4/dist/umd/supabase.js"></script>
 <script>
 const PER=12;
 const grid=document.getElementById('grid'),pager=document.getElementById('pager'),toast=document.getElementById('toast');
@@ -138,7 +136,7 @@ function applyRow(r){
   liveRun=r.run_id;liveTs=r.ts;
   if(r.step==='note'||r.step==='video-job'){if(r.message)liveNote=r.message}
   else liveState[r.step]=r.state;
-  if(r.step==='publish'&&r.state==='done'&&!reloadTimer)reloadTimer=setTimeout(()=>location.reload(),6000);
+  
 }
 function renderLive(){
   const started=Object.keys(liveState).length>0;
@@ -151,19 +149,19 @@ function renderLive(){
   liveEl.appendChild(ol);
   if(liveNote)liveEl.appendChild(el('div','note',liveNote));
 }
-function startLive(){
-  const cfg=window.DAYCLP_SB;
-  if(!cfg||!window.supabase)return;
-  try{
-    const sb=window.supabase.createClient(cfg.url,cfg.key,{auth:{persistSession:false}});
-    sb.from('dayclp_progress').select('*').order('id',{ascending:false}).limit(80).then(({data})=>{
-      if(!data||!data.length)return;
-      const run=data[0].run_id;
-      data.filter(r=>r.run_id===run).reverse().forEach(applyRow);renderLive();
-    });
-    sb.channel('dayclp').on('postgres_changes',{event:'INSERT',schema:'public',table:'dayclp_progress'},p=>{applyRow(p.new);renderLive()}).subscribe();
-  }catch(e){}
+let lastRun='';
+function pollLive(){
+  fetch('data/progress.json?_='+Date.now(),{cache:'no-store'}).then(r=>r.ok?r.json():null).then(d=>{
+    if(!d||!d.steps){liveEl.hidden=true;return}
+    liveState=d.steps;liveNote=d.note||'';liveTs=d.updated||'';
+    if(liveState.publish==='done'){
+      if(lastRun&&lastRun===d.run_id)setTimeout(()=>location.reload(),3000);
+      liveEl.hidden=true;return;
+    }
+    lastRun=d.run_id;renderLive();
+  }).catch(()=>{liveEl.hidden=true});
 }
+function startLive(){pollLive();setInterval(pollLive,15000)}
 startLive();
 fetch('data/videos.json',{cache:'no-cache'}).then(r=>r.json()).then(d=>{
   items=d.sort((a,b)=>b.ts.localeCompare(a.ts));
