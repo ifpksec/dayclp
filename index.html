@@ -93,7 +93,7 @@ function making(m){
     [[m.profile_image,'프로필'+(m.profile_service?' · '+m.profile_service:'')],[m.keyframe_image,'키프레임'+(m.keyframe_service?' · '+m.keyframe_service:'')]].forEach(([u,t])=>{if(!u)return;const f=el('div');const i=document.createElement('img');i.src=u;i.loading='lazy';i.alt=t;f.append(i,el('div','mut',t));r.appendChild(f)});
     s.appendChild(r);
   }
-  if(m.board){const s=sec(w,'4. 클립과 대본'+(m.script_service?' · '+m.script_service:''));list(s,m.board.clips.map(c=>c.n+'. '+c.visual+' — “'+c.script+'”'))}
+  if(m.board){const s=sec(w,'4. 클립과 대본'+(m.script_service?' · '+m.script_service:''));list(s,m.board.clips.map(c=>c.n+'. '+c.visual+(c.script?' — “'+c.script+'”':'')))}
   d.appendChild(w);return d;
 }
 function card(it){
@@ -131,7 +131,7 @@ function go(p){page=p;history.replaceState(null,'','?page='+p);render();window.s
 
 const STEPS=[['collect','자료 수집'],['topics','소재 선정'],['storyboard','콘티 확정'],['profile_image','프로필 이미지'],['keyframe_image','키프레임 이미지'],['scripts','대본'],['clips','클립 생성'],['assemble','영상 합치기'],['publish','발행']];
 const liveEl=document.getElementById('live');
-let liveRun=null,liveState={},liveNote='',liveTs=0,reloadTimer=null;
+let liveRun=null,liveState={},liveNote='',liveTs=0,reloadTimer=null,liveMaking={},liveOpen=true,liveSig='';
 function applyRow(r){
   if(!r||!r.run_id)return;
   if(liveRun&&r.run_id!==liveRun){if(new Date(r.ts)<=new Date(liveTs))return;liveState={};liveNote=''}
@@ -150,17 +150,19 @@ function renderLive(){
   STEPS.forEach(([k,t])=>{const s=liveState[k];const li=el('li',s==='running'?'run':s==='done'?'done':s==='failed'?'failed':'',t+(s==='running'?' …':s==='done'?' ✓':s==='failed'?' ✗':''));ol.appendChild(li)});
   liveEl.appendChild(ol);
   if(liveNote)liveEl.appendChild(el('div','note',liveNote));
+  if(liveMaking&&(liveMaking.topic||liveMaking.board)){const mk=making(liveMaking);mk.open=liveOpen;mk.addEventListener('toggle',()=>{liveOpen=mk.open});liveEl.appendChild(mk)}
 }
 let lastRun='';
 function pollLive(){
   fetch('data/progress.json?_='+Date.now(),{cache:'no-store'}).then(r=>r.ok?r.json():null).then(d=>{
     if(!d||!d.steps){liveEl.hidden=true;return}
-    liveState=d.steps;liveNote=d.note||'';liveTs=d.updated||'';
+    liveState=d.steps;liveNote=d.note||'';liveTs=d.updated||'';liveMaking=d.making||{};
     if(liveState.publish==='done'){
       if(lastRun&&lastRun===d.run_id)setTimeout(()=>location.reload(),3000);
       liveEl.hidden=true;return;
     }
-    lastRun=d.run_id;renderLive();
+    lastRun=d.run_id;
+    const sig=JSON.stringify([d.steps,d.note,d.making]);if(sig===liveSig)return;liveSig=sig;renderLive();
   }).catch(()=>{liveEl.hidden=true});
 }
 function startLive(){pollLive();setInterval(pollLive,15000)}
