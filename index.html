@@ -34,6 +34,13 @@ main{max-width:1100px;margin:0 auto;padding:8px 16px 40px}
 .mk img{width:48%;border-radius:8px;border:1px solid var(--line)}
 .imgs{display:flex;gap:8px}
 .mut{color:var(--mut)}
+.live{margin:0 0 16px;background:var(--card);border:1px solid var(--acc);border-radius:12px;padding:12px 14px}
+.live h3{margin:0 0 6px;font-size:14px}
+.live ol{margin:0;padding-left:20px;font-size:13px}
+.live li.run{color:var(--acc);font-weight:600}
+.live li.done{color:var(--mut)}
+.live li.failed{color:#d33}
+.live .note{margin-top:6px;font-size:12px;color:var(--mut)}
 .empty{padding:60px 0;text-align:center;color:var(--mut)}
 .toast{position:fixed;left:50%;bottom:24px;transform:translateX(-50%);background:var(--fg);color:var(--bg);padding:8px 14px;border-radius:8px;font-size:14px;opacity:0;transition:opacity .2s;pointer-events:none}
 .toast.on{opacity:1}
@@ -45,10 +52,13 @@ main{max-width:1100px;margin:0 auto;padding:8px 16px 40px}
 <p>한국재무설계협회 30초 영상 · 매일 새 영상이 올라옵니다</p>
 </header>
 <main>
+<section id="live" class="live" hidden></section>
 <div id="grid" class="grid"></div>
 <div id="pager" class="pager"></div>
 </main>
 <div id="toast" class="toast"></div>
+<script src="config.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2.45.4/dist/umd/supabase.js"></script>
 <script>
 const PER=12;
 const grid=document.getElementById('grid'),pager=document.getElementById('pager'),toast=document.getElementById('toast');
@@ -118,6 +128,43 @@ function render(){
   }
 }
 function go(p){page=p;history.replaceState(null,'','?page='+p);render();window.scrollTo(0,0)}
+
+const STEPS=[['collect','자료 수집'],['topics','소재 선정'],['storyboard','콘티 확정'],['profile_image','프로필 이미지'],['keyframe_image','키프레임 이미지'],['scripts','대본'],['clips','클립 생성'],['assemble','영상 합치기'],['publish','발행']];
+const liveEl=document.getElementById('live');
+let liveRun=null,liveState={},liveNote='',liveTs=0,reloadTimer=null;
+function applyRow(r){
+  if(!r||!r.run_id)return;
+  if(liveRun&&r.run_id!==liveRun){if(new Date(r.ts)<=new Date(liveTs))return;liveState={};liveNote=''}
+  liveRun=r.run_id;liveTs=r.ts;
+  if(r.step==='note'||r.step==='video-job'){if(r.message)liveNote=r.message}
+  else liveState[r.step]=r.state;
+  if(r.step==='publish'&&r.state==='done'&&!reloadTimer)reloadTimer=setTimeout(()=>location.reload(),6000);
+}
+function renderLive(){
+  const started=Object.keys(liveState).length>0;
+  const fresh=liveTs&&Date.now()-new Date(liveTs)<4*3600*1000;
+  if(!started||!fresh||liveState.publish==='done'&&!reloadTimer){liveEl.hidden=true;return}
+  liveEl.hidden=false;liveEl.replaceChildren();
+  liveEl.appendChild(el('h3',null,'지금 제작 중인 영상'));
+  const ol=el('ol');
+  STEPS.forEach(([k,t])=>{const s=liveState[k];const li=el('li',s==='running'?'run':s==='done'?'done':s==='failed'?'failed':'',t+(s==='running'?' …':s==='done'?' ✓':s==='failed'?' ✗':''));ol.appendChild(li)});
+  liveEl.appendChild(ol);
+  if(liveNote)liveEl.appendChild(el('div','note',liveNote));
+}
+function startLive(){
+  const cfg=window.DAYCLP_SB;
+  if(!cfg||!window.supabase)return;
+  try{
+    const sb=window.supabase.createClient(cfg.url,cfg.key,{auth:{persistSession:false}});
+    sb.from('dayclp_progress').select('*').order('id',{ascending:false}).limit(80).then(({data})=>{
+      if(!data||!data.length)return;
+      const run=data[0].run_id;
+      data.filter(r=>r.run_id===run).reverse().forEach(applyRow);renderLive();
+    });
+    sb.channel('dayclp').on('postgres_changes',{event:'INSERT',schema:'public',table:'dayclp_progress'},p=>{applyRow(p.new);renderLive()}).subscribe();
+  }catch(e){}
+}
+startLive();
 fetch('data/videos.json',{cache:'no-cache'}).then(r=>r.json()).then(d=>{
   items=d.sort((a,b)=>b.ts.localeCompare(a.ts));
   page=parseInt(new URLSearchParams(location.search).get('page')||'1',10)||1;
