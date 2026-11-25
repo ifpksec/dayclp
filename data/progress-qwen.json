@@ -1,1 +1,1 @@
-{"backend": "qwen", "run_id": "20261126-060122", "steps": {"backend": "done", "collect": "done", "topics": "done", "storyboard": "running"}, "note": "opening candidates: 카메라가 높은 곳에서 내려오며 상황을 보여 준다 / 움직이는 탈것이나 이동 중인 상태에서 연다 / 이미 행동 한가운데(달리기, 요리, 정리, 대화)에서 컷인한다", "updated": "2026-11-26T06:19:54+09:00", "making": {}}
+{"backend": "qwen", "run_id": "20261126-060122", "steps": {"backend": "done", "collect": "done", "topics": "done", "storyboard": "running"}, "note": "flow check: gemini=0.09/0", "updated": "2026-11-26T06:20:40+09:00", "making": {}}
