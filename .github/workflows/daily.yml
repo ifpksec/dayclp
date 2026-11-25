@@ -10,7 +10,11 @@ on:
         required: false
         default: ''
       clips:
-        description: number of clips to generate (empty means all)
+        description: number of clips to generate (empty means 4 for gemini, 3 for flow)
+        required: false
+        default: ''
+      backend:
+        description: video service gemini or flow (empty picks automatically)
         required: false
         default: ''
       avoid:
@@ -65,6 +69,7 @@ jobs:
           DAYCLP_STOP_AFTER: ${{ inputs.stop_after }}
           DAYCLP_AVOID: ${{ inputs.avoid }}
           DAYCLP_CLIPS: ${{ inputs.clips }}
+          DAYCLP_VIDEO_BACKEND: ${{ inputs.backend }}
         run: |
           git rev-parse HEAD
           python main.py

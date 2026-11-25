@@ -178,7 +178,7 @@ function render(){
 }
 function go(p){page=p;history.replaceState(null,'','?page='+p);render();window.scrollTo(0,0)}
 
-const STEPS=[['collect','자료 수집'],['topics','소재 선정'],['storyboard','콘티 확정'],['profile_image','프로필 이미지'],['keyframe_image','키프레임 이미지'],['frames','클립별 시작 프레임'],['scripts','대본'],['clips','클립 생성·검토'],['assemble','영상 합치기'],['reflect','반성과 교훈'],['publish','발행']];
+const STEPS=[['backend','영상 서비스 선택'],['collect','자료 수집'],['topics','소재 선정'],['storyboard','콘티 확정'],['profile_image','프로필 이미지'],['keyframe_image','키프레임 이미지'],['frames','클립별 시작 프레임'],['scripts','대본'],['clips','클립 생성·검토'],['assemble','영상 합치기'],['reflect','반성과 교훈'],['publish','발행']];
 const liveEl=document.getElementById('live');
 let liveRun=null,liveState={},liveNote='',liveTs=0,reloadTimer=null,liveMaking={},liveSig='',liveScroll=0;
 function renderLive(){
