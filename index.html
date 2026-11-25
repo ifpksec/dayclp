@@ -23,6 +23,9 @@ main{max-width:1400px;margin:0 auto;padding:8px 16px 40px}
 .title{font-weight:600}
 .meta{color:var(--mut);font-size:13px}
 .cap{font-size:13px}
+.badge{align-self:flex-start;font-size:12px;font-weight:600;padding:2px 8px;border-radius:999px;border:1px solid var(--line)}
+.badge.ok{color:#1a7f37;border-color:#1a7f37}
+.badge.part{color:#b35900;border-color:#b35900;background:rgba(179,89,0,.1)}
 .row{display:flex;gap:8px;padding-top:6px}
 .btn{flex:1;text-align:center;padding:8px;border:1px solid var(--line);border-radius:8px;background:transparent;color:var(--acc);font:inherit;font-size:14px;cursor:pointer;text-decoration:none}
 .btn:hover{border-color:var(--acc)}
@@ -146,6 +149,8 @@ function card(it){
   v.addEventListener('play',()=>document.querySelectorAll('video').forEach(o=>{if(o!==v)o.pause()}));
   c.appendChild(v);
   const b=el('div','body');
+  const mk0=it.making||{},tot=(mk0.board&&mk0.board.clips||[]).length,done=(mk0.clip_reviews||[]).length;
+  b.appendChild(mk0.partial?el('div','badge part','미완성 · 클립 '+done+'/'+tot+'개만 생성'):el('div','badge ok','완성'+(tot?' · 클립 '+tot+'개':'')));
   b.appendChild(el('div','title',it.title));
   b.appendChild(el('div','meta',it.ts.replace('T',' ').slice(0,16)+' · '+it.category));
   if(it.caption)b.appendChild(el('div','cap',it.caption));
