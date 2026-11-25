@@ -68,6 +68,14 @@ jobs:
         run: |
           git rev-parse HEAD
           python main.py
+      - name: Save work
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: dayclp-work-${{ github.run_id }}
+          path: ${{ runner.temp }}/work
+          retention-days: 30
+          if-no-files-found: ignore
       - name: Publish
         run: |
           if [ -z "${{ inputs.stop_after }}" ]; then rm -rf site/live; fi

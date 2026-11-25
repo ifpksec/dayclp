@@ -129,6 +129,7 @@ function making(m){
       if(r){s.appendChild(el('h4',null,'감독 검토'));reviewBox(s,r)}
     });
   }
+  if(m.partial){const s=stage(w,'일부만 생성됨',true);s.appendChild(el('div',null,m.partial))}
   if(m.final_review){
     const f=m.final_review,s=stage(w,'반성과 교훈 · '+f.score+'점 (연결 '+f.continuity+')',true);
     if(f.summary)s.appendChild(el('div',null,f.summary));
