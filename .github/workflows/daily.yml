@@ -10,11 +10,11 @@ on:
         required: false
         default: ''
       clips:
-        description: number of clips to generate (empty means 4 for gemini, 3 for flow)
+        description: number of clips to generate (empty means 4 for gemini, 3 for flow, 5 for qwen)
         required: false
         default: ''
       backend:
-        description: video service gemini or flow (empty picks automatically)
+        description: video service gemini, flow, qwen or auto (empty runs all three at once)
         required: false
         default: ''
       avoid:
@@ -24,15 +24,37 @@ on:
 
 permissions:
   contents: write
-
-concurrency:
-  group: dayclp
-  cancel-in-progress: false
+  actions: write
 
 jobs:
-  run:
+  plan:
     runs-on: ubuntu-latest
-    timeout-minutes: 330
+    outputs:
+      list: ${{ steps.m.outputs.list }}
+    steps:
+      - id: m
+        run: |
+          B="${{ inputs.backend }}"
+          if [ -n "$B" ]; then
+            echo "list=[\"$B\"]" >> "$GITHUB_OUTPUT"
+          else
+            echo 'list=["gemini","flow","qwen"]' >> "$GITHUB_OUTPUT"
+          fi
+
+  run:
+    needs: plan
+    runs-on: ubuntu-latest
+    timeout-minutes: 345
+    strategy:
+      fail-fast: false
+      matrix:
+        backend: ${{ fromJson(needs.plan.outputs.list) }}
+    concurrency:
+      group: dayclp-${{ matrix.backend }}
+      cancel-in-progress: false
+    env:
+      GH_TOKEN: ${{ github.token }}
+      PAUSED_NAME: dayclp-paused-${{ matrix.backend }}
     steps:
       - uses: actions/checkout@v4
         with:
@@ -58,7 +80,21 @@ jobs:
           sudo apt-get update -qq
           sudo apt-get install -y -qq ffmpeg
           pip install -q -r src/requirements.txt
+      - name: Find unfinished session
+        if: ${{ inputs.stop_after == '' }}
+        run: |
+          row=$(gh api "repos/${GITHUB_REPOSITORY}/actions/artifacts?name=${PAUSED_NAME}&per_page=20" --jq '[.artifacts[] | select(.expired == false)] | sort_by(.created_at) | last | select(. != null) | "\(.id) \(.workflow_run.id)"' || true)
+          if [ -n "$row" ]; then
+            aid="${row% *}"; rid="${row#* }"
+            mkdir -p "$RUNNER_TEMP/resume"
+            if gh run download "$rid" -n "$PAUSED_NAME" -D "$RUNNER_TEMP/resume" -R "$GITHUB_REPOSITORY"; then
+              echo "DAYCLP_RESUME_DIR=$RUNNER_TEMP/resume" >> "$GITHUB_ENV"
+              echo "OLD_PAUSED_ID=$aid" >> "$GITHUB_ENV"
+              echo "resuming the unfinished ${{ matrix.backend }} session from run $rid"
+            fi
+          fi
       - name: Run
+        id: run
         working-directory: src
         env:
           WA_BASE: ${{ secrets.WA_BASE }}
@@ -69,27 +105,69 @@ jobs:
           DAYCLP_STOP_AFTER: ${{ inputs.stop_after }}
           DAYCLP_AVOID: ${{ inputs.avoid }}
           DAYCLP_CLIPS: ${{ inputs.clips }}
-          DAYCLP_VIDEO_BACKEND: ${{ inputs.backend }}
+          DAYCLP_VIDEO_BACKEND: ${{ matrix.backend }}
         run: |
           git rev-parse HEAD
           python main.py
+      - name: Check session state
+        id: chk
+        if: always()
+        run: |
+          if [ -f "$RUNNER_TEMP/work/paused.flag" ]; then
+            echo "keep=true" >> "$GITHUB_OUTPUT"
+            echo "paused=true" >> "$GITHUB_OUTPUT"
+          elif [ "${{ steps.run.outcome }}" != "success" ] && [ -f "$RUNNER_TEMP/work/checkpoint.json" ]; then
+            echo "keep=true" >> "$GITHUB_OUTPUT"
+            echo "paused=false" >> "$GITHUB_OUTPUT"
+          else
+            echo "keep=false" >> "$GITHUB_OUTPUT"
+            echo "paused=false" >> "$GITHUB_OUTPUT"
+          fi
       - name: Save work
         if: always()
         uses: actions/upload-artifact@v4
         with:
-          name: dayclp-work-${{ github.run_id }}
+          name: dayclp-work-${{ github.run_id }}-${{ matrix.backend }}
           path: ${{ runner.temp }}/work
           retention-days: 30
           if-no-files-found: ignore
+      - name: Keep unfinished session
+        if: ${{ always() && inputs.stop_after == '' && steps.chk.outputs.keep == 'true' }}
+        uses: actions/upload-artifact@v4
+        with:
+          name: dayclp-paused-${{ matrix.backend }}
+          path: ${{ runner.temp }}/work
+          retention-days: 14
+          if-no-files-found: ignore
+      - name: Retire the resumed session
+        if: ${{ always() && inputs.stop_after == '' && env.OLD_PAUSED_ID != '' && (steps.chk.outputs.keep == 'true' || steps.run.outcome == 'success') }}
+        run: gh api -X DELETE "repos/${GITHUB_REPOSITORY}/actions/artifacts/${OLD_PAUSED_ID}" || true
       - name: Publish
+        if: ${{ steps.run.outcome == 'success' && steps.chk.outputs.paused != 'true' }}
+        env:
+          TAG: ${{ matrix.backend }}
         run: |
-          if [ -z "${{ inputs.stop_after }}" ]; then rm -rf site/live; fi
+          if [ -z "${{ inputs.stop_after }}" ]; then rm -f site/live/${TAG}-*; fi
           cp ui/index.html ui/favicon.svg site/
           touch site/.nojekyll
-          cd site
-          git init -q -b gh-pages
-          git config user.name "dayclp"
-          git config user.email "dayclp@users.noreply.github.com"
-          git add -A
-          git commit -q -m "publish $(date -u +%Y-%m-%dT%H:%MZ) [skip ci]"
-          git push -q --force "https://x-access-token:${{ secrets.GITHUB_TOKEN }}@github.com/${GITHUB_REPOSITORY}.git" gh-pages
+          ok=0
+          for n in 1 2 3 4 5 6 7 8; do
+            rm -rf pub
+            if git ls-remote --exit-code --heads "https://github.com/${GITHUB_REPOSITORY}.git" gh-pages >/dev/null 2>&1; then
+              git clone -q --depth 1 --branch gh-pages "https://x-access-token:${{ secrets.GITHUB_TOKEN }}@github.com/${GITHUB_REPOSITORY}.git" pub
+            else
+              mkdir pub
+              git -C pub init -q -b gh-pages
+              git -C pub remote add origin "https://x-access-token:${{ secrets.GITHUB_TOKEN }}@github.com/${GITHUB_REPOSITORY}.git"
+            fi
+            python3 ui/tools/merge_site.py site pub "$TAG"
+            cd pub
+            git config user.name "dayclp"
+            git config user.email "dayclp@users.noreply.github.com"
+            git add -A
+            git commit -q -m "publish $TAG $(date -u +%Y-%m-%dT%H:%MZ) [skip ci]" || true
+            if git push -q origin gh-pages; then ok=1; cd ..; break; fi
+            cd ..
+            sleep $((RANDOM % 20 + 5))
+          done
+          [ "$ok" = "1" ]

@@ -63,6 +63,7 @@ main{max-width:1400px;margin:0 auto;padding:8px 16px 40px}
   .card{flex:none;width:100%;max-width:340px;margin:0 auto}
   .stage,.stage.wide{flex-basis:84vw}
 }
+.livebox{margin:14px 0;padding-top:12px;border-top:1px solid rgba(128,128,128,.25)}.livebox h4{margin:0 0 8px;font-size:15px}
 </style>
 </head>
 <body>
@@ -180,32 +181,45 @@ function go(p){page=p;history.replaceState(null,'','?page='+p);render();window.s
 
 const STEPS=[['backend','영상 서비스 선택'],['collect','자료 수집'],['topics','소재 선정'],['storyboard','콘티 확정'],['profile_image','프로필 이미지'],['keyframe_image','키프레임 이미지'],['frames','클립별 시작 프레임'],['scripts','대본'],['clips','클립 생성·검토'],['assemble','영상 합치기'],['reflect','반성과 교훈'],['publish','발행']];
 const liveEl=document.getElementById('live');
-let liveRun=null,liveState={},liveNote='',liveTs=0,reloadTimer=null,liveMaking={},liveSig='',liveScroll=0;
+const BACKENDS=[['gemini','Gemini'],['flow','Flow'],['qwen','Qwen'],['auto','자동 선택'],['','']];
+const liveData={};let liveSig='',lastRuns={},reloadTimer=null;
 function renderLive(){
-  const started=Object.keys(liveState).length>0;
-  const fresh=liveTs&&Date.now()-new Date(liveTs)<4*3600*1000;
-  if(!started||!fresh||liveState.publish==='done'&&!reloadTimer){liveEl.hidden=true;return}
-  const old=liveEl.querySelector('.mk');if(old)liveScroll=old.scrollLeft;
+  const keep={};liveEl.querySelectorAll('.mk').forEach(m=>{keep[m.dataset.b]=m.scrollLeft});
+  const act=BACKENDS.map(([k,t])=>[k,t,liveData[k]]).filter(([k,t,d])=>{
+    if(!d||!d.steps||!Object.keys(d.steps).length)return false;
+    const fresh=d.updated&&Date.now()-new Date(d.updated)<30*3600*1000;
+    return fresh&&d.steps.publish!=='done';
+  });
+  if(!act.length){liveEl.hidden=true;return}
   liveEl.hidden=false;liveEl.replaceChildren();
   liveEl.appendChild(el('h3',null,'지금 제작 중인 영상'));
-  const ol=el('ol');
-  STEPS.forEach(([k,t])=>{const s=liveState[k];const li=el('li',s==='running'?'run':s==='done'?'done':s==='failed'?'failed':'',t+(s==='running'?' …':s==='done'?' ✓':s==='failed'?' ✗':''));ol.appendChild(li)});
-  liveEl.appendChild(ol);
-  if(liveNote)liveEl.appendChild(el('div','note',liveNote));
-  if(liveMaking&&(liveMaking.topic||liveMaking.board)){const mk=making(liveMaking);liveEl.appendChild(mk);mk.scrollLeft=liveScroll}
+  act.forEach(([k,t,d])=>{
+    const box=el('div','livebox');
+    const paused=Object.values(d.steps).includes('paused');
+    box.appendChild(el('h4',null,(t?t+' · ':'')+(paused?'사용량 한도로 대기 중 — 다음 실행에서 이어서 완성합니다':'진행 중')));
+    const ol=el('ol');
+    STEPS.forEach(([sk,st])=>{const s=d.steps[sk];const li=el('li',s==='running'?'run':s==='done'?'done':s==='failed'?'failed':s==='paused'?'run':'',st+(s==='running'?' …':s==='done'?' ✓':s==='failed'?' ✗':s==='paused'?' ⏸':''));ol.appendChild(li)});
+    box.appendChild(ol);
+    if(d.note)box.appendChild(el('div','note',d.note));
+    const mkd=d.making||{};
+    if(mkd.topic||mkd.board){const mk=making(mkd);mk.dataset.b=k;box.appendChild(mk);mk.scrollLeft=keep[k]||0}
+    liveEl.appendChild(box);
+  });
 }
-let lastRun='';
 function pollLive(){
-  fetch('data/progress.json?_='+Date.now(),{cache:'no-store'}).then(r=>r.ok?r.json():null).then(d=>{
-    if(!d||!d.steps){liveEl.hidden=true;return}
-    liveState=d.steps;liveNote=d.note||'';liveTs=d.updated||'';liveMaking=d.making||{};
-    if(liveState.publish==='done'){
-      if(lastRun&&lastRun===d.run_id)setTimeout(()=>location.reload(),3000);
-      liveEl.hidden=true;return;
-    }
-    lastRun=d.run_id;
-    const sig=JSON.stringify([d.steps,d.note,d.making]);if(sig===liveSig)return;liveSig=sig;renderLive();
-  }).catch(()=>{liveEl.hidden=true});
+  Promise.all(BACKENDS.map(([k])=>fetch('data/progress'+(k?'-'+k:'')+'.json?_='+Date.now(),{cache:'no-store'}).then(r=>r.ok?r.json():null).catch(()=>null))).then(all=>{
+    let reload=false;
+    BACKENDS.forEach(([k],i)=>{
+      const d=all[i];
+      if(!d||!d.steps){delete liveData[k];return}
+      liveData[k]=d;
+      if(d.steps.publish==='done'){if(lastRuns[k]&&lastRuns[k]===d.run_id)reload=true}
+      else lastRuns[k]=d.run_id;
+    });
+    if(reload&&!reloadTimer){reloadTimer=setTimeout(()=>location.reload(),3000)}
+    const sig=JSON.stringify(Object.values(liveData).map(d=>[d.steps,d.note,d.making]));
+    if(sig===liveSig)return;liveSig=sig;renderLive();
+  });
 }
 function startLive(){pollLive();setInterval(pollLive,15000)}
 startLive();
