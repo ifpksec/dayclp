@@ -1,1 +1,1 @@
-{"backend": "qwen", "run_id": "20261126-060122", "steps": {"backend": "done", "collect": "done", "topics": "done", "storyboard": "running"}, "note": "flow check: gemini=0.09/0", "updated": "2026-11-26T06:27:36+09:00", "making": {}}
+{"backend": "qwen", "run_id": "20261126-060122", "steps": {"backend": "done", "collect": "done", "topics": "done", "storyboard": "running"}, "note": "flow check: gemini=0.09/0", "updated": "2026-11-26T06:28:22+09:00", "making": {}}
