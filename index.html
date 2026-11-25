@@ -1,0 +1,219 @@
+<!doctype html>
+<html lang="ko">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>dayclp 영상 갤러리</title>
+<link rel="icon" type="image/svg+xml" href="favicon.svg">
+<link rel="apple-touch-icon" href="favicon.svg">
+<style>
+:root{--bg:#f6f7f9;--fg:#15181d;--mut:#5d6672;--card:#fff;--line:#e2e5ea;--acc:#0a5fd8;--bad:#d33;--good:#18864b}
+@media (prefers-color-scheme:dark){:root{--bg:#0f1216;--fg:#e8ebef;--mut:#98a2ae;--card:#181c22;--line:#2a3039;--acc:#6aa5ff;--bad:#ff7b72;--good:#56d364}}
+*{box-sizing:border-box}
+body{margin:0;background:var(--bg);color:var(--fg);font:15px/1.5 system-ui,-apple-system,"Segoe UI",sans-serif}
+header{max-width:1400px;margin:0 auto;padding:24px 16px 8px}
+h1{margin:0;font-size:22px}
+header p{margin:4px 0 0;color:var(--mut)}
+main{max-width:1400px;margin:0 auto;padding:8px 16px 40px}
+.list{display:flex;flex-direction:column;gap:20px}
+.item{display:flex;gap:16px;align-items:flex-start}
+.card{flex:0 0 260px;width:260px;background:var(--card);border:1px solid var(--line);border-radius:12px;overflow:hidden;display:flex;flex-direction:column}
+.card video{width:100%;aspect-ratio:9/16;background:#000;display:block;object-fit:contain}
+.body{padding:12px;display:flex;flex-direction:column;gap:6px}
+.title{font-weight:600}
+.meta{color:var(--mut);font-size:13px}
+.cap{font-size:13px}
+.badge{align-self:flex-start;font-size:12px;font-weight:600;padding:2px 8px;border-radius:999px;border:1px solid var(--line)}
+.badge.ok{color:#1a7f37;border-color:#1a7f37}
+.badge.part{color:#b35900;border-color:#b35900;background:rgba(179,89,0,.1)}
+.row{display:flex;gap:8px;padding-top:6px}
+.btn{flex:1;text-align:center;padding:8px;border:1px solid var(--line);border-radius:8px;background:transparent;color:var(--acc);font:inherit;font-size:14px;cursor:pointer;text-decoration:none}
+.btn:hover{border-color:var(--acc)}
+.pager{display:flex;justify-content:center;align-items:center;gap:12px;margin-top:24px}
+.pager .btn{flex:none;min-width:84px}
+.btn[disabled]{opacity:.4;cursor:default}
+.mkwrap{flex:1;min-width:0}
+.mkhead{font-size:13px;color:var(--mut);margin:0 0 6px}
+.mk{display:flex;gap:12px;overflow-x:auto;padding-bottom:10px;scroll-snap-type:x proximity;align-items:stretch}
+.stage{flex:0 0 300px;scroll-snap-align:start;background:var(--card);border:1px solid var(--line);border-radius:12px;padding:12px;font-size:13px;display:flex;flex-direction:column;gap:8px}
+.stage.wide{flex-basis:340px}
+.stage h4{margin:0;font-size:13px;color:var(--acc)}
+.stage ul{margin:0;padding-left:18px}
+.stage img{width:100%;border-radius:8px;border:1px solid var(--line);cursor:zoom-in;display:block}
+.mut{color:var(--mut)}
+.ok{color:var(--good)}
+.ng{color:var(--bad)}
+.attempt{border-top:1px dashed var(--line);padding-top:6px}
+.score{font-weight:600}
+.live{margin:0 0 20px;background:var(--card);border:1px solid var(--acc);border-radius:12px;padding:12px 14px}
+.live h3{margin:0 0 6px;font-size:14px}
+.live ol{margin:0 0 10px;padding-left:20px;font-size:13px}
+.live li.run{color:var(--acc);font-weight:600}
+.live li.done{color:var(--mut)}
+.live li.failed{color:var(--bad)}
+.live .note{margin:0 0 10px;font-size:12px;color:var(--mut)}
+.empty{padding:60px 0;text-align:center;color:var(--mut)}
+.toast{position:fixed;left:50%;bottom:24px;transform:translateX(-50%);background:var(--fg);color:var(--bg);padding:8px 14px;border-radius:8px;font-size:14px;opacity:0;transition:opacity .2s;pointer-events:none}
+.toast.on{opacity:1}
+.lb{position:fixed;inset:0;background:rgba(0,0,0,.88);display:none;align-items:center;justify-content:center;z-index:50;cursor:zoom-out;padding:16px}
+.lb.on{display:flex}
+.lb img{max-width:100%;max-height:100%;object-fit:contain;border-radius:6px}
+@media (max-width:760px){
+  .item{flex-direction:column;align-items:stretch}
+  .card{flex:none;width:100%;max-width:340px;margin:0 auto}
+  .stage,.stage.wide{flex-basis:84vw}
+}
+</style>
+</head>
+<body>
+<header>
+<h1>dayclp</h1>
+<p>한국재무설계협회 30초 영상 · 매일 새 영상이 올라옵니다</p>
+</header>
+<main>
+<section id="live" class="live" hidden></section>
+<div id="grid" class="list"></div>
+<div id="pager" class="pager"></div>
+</main>
+<div id="toast" class="toast"></div>
+<div id="lb" class="lb"><img alt=""></div>
+<script>
+const PER=6;
+const grid=document.getElementById('grid'),pager=document.getElementById('pager'),toast=document.getElementById('toast'),lb=document.getElementById('lb');
+let items=[],page=1;
+function abs(p){return new URL(p,location.href).href}
+function say(t){toast.textContent=t;toast.classList.add('on');setTimeout(()=>toast.classList.remove('on'),1600)}
+async function copy(text){
+  try{await navigator.clipboard.writeText(text);say('링크를 복사했습니다')}
+  catch(e){const a=document.createElement('textarea');a.value=text;document.body.appendChild(a);a.select();try{document.execCommand('copy');say('링크를 복사했습니다')}catch(_){say('복사하지 못했습니다')}a.remove()}
+}
+function el(tag,cls,text){const e=document.createElement(tag);if(cls)e.className=cls;if(text!=null)e.textContent=text;return e}
+function list(parent,rows){const u=el('ul');rows.forEach(r=>u.appendChild(el('li',null,r)));parent.appendChild(u)}
+function zoom(src){lb.firstChild.src=src;lb.classList.add('on')}
+lb.onclick=()=>{lb.classList.remove('on');lb.firstChild.removeAttribute('src')};
+document.addEventListener('keydown',e=>{if(e.key==='Escape')lb.onclick()});
+function pic(parent,src,alt){const i=document.createElement('img');i.src=src;i.loading='lazy';i.alt=alt;i.onclick=()=>zoom(src);parent.appendChild(i);return i}
+function stage(host,title,wide){const s=el('div','stage'+(wide?' wide':''));s.appendChild(el('h4',null,title));host.appendChild(s);return s}
+function reviewBox(parent,r){
+  (r.attempts||[]).forEach((a,k)=>{
+    const d=el('div','attempt');
+    if(a.score==null){d.appendChild(el('div','mut',(a.issues||[])[0]||'검토 없음'));parent.appendChild(d);return}
+    const chosen=r.chosen===k;
+    d.appendChild(el('div','score '+(a.score>=7&&!a.text?'ok':'ng'),'시도 '+(k+1)+' · '+a.score+'점 (인물 '+a.identity+' · 연결 '+a.continuity+' · 장면 '+a.scene+')'+(a.text?' · 화면 글자':'')+(chosen?' · 채택':'')));
+    if(a.issues&&a.issues.length)list(d,a.issues);
+    if(a.fix&&!chosen)d.appendChild(el('div','mut','→ 재생성 지시: '+a.fix));
+    parent.appendChild(d);
+  });
+}
+function making(m){
+  const w=el('div','mk');
+  if(m.topic){
+    const s=stage(w,'1. 소재 선정');
+    s.appendChild(el('div',null,'['+m.topic.category+'] '+m.topic.title));
+    if(m.topic.angle)s.appendChild(el('div','mut',m.topic.angle));
+    if(m.topic_candidates)list(s,m.topic_candidates.map(c=>c.votes+'표 · '+c.title+(c.by?' ('+c.by+')':'')));
+  }
+  if(m.board){
+    const s=stage(w,'2. 콘티');
+    s.appendChild(el('div',null,m.board.title+' · '+m.board.pov+'/'+m.board.subject+(m.board.narration_only?' · 나레이션':'')));
+    s.appendChild(el('div','mut','톤: '+m.board.tone));
+    if(m.board_candidates)list(s,m.board_candidates.map(c=>c.votes+'표 · '+c.title+(c.by?' ('+c.by+')':'')));
+    if(m.board.characters&&m.board.characters.length){s.appendChild(el('h4',null,'등장인물'));list(s,m.board.characters.map(x=>x.name+': '+x.desc))}
+  }
+  if(m.profile_image){const s=stage(w,'3. 프로필 시트'+(m.profile_service?' · '+m.profile_service:''),true);pic(s,m.profile_image,'프로필')}
+  if(m.keyframe_image){const s=stage(w,'4. 키프레임 시트'+(m.keyframe_service?' · '+m.keyframe_service:''),true);pic(s,m.keyframe_image,'키프레임')}
+  if(m.board){
+    m.board.clips.forEach((c,k)=>{
+      const s=stage(w,'클립 '+c.n+(k===0&&m.script_service?' · 대본 '+m.script_service:''),true);
+      if(m.clip_images&&m.clip_images[k])pic(s,m.clip_images[k],'클립 '+c.n+' 프레임');
+      s.appendChild(el('div',null,c.visual));
+      if(c.script)s.appendChild(el('div','mut','“'+c.script+'”'));
+      const r=(m.clip_reviews||[]).find(x=>x.n===c.n);
+      if(r){s.appendChild(el('h4',null,'감독 검토'));reviewBox(s,r)}
+    });
+  }
+  if(m.partial){const s=stage(w,'일부만 생성됨',true);s.appendChild(el('div',null,m.partial))}
+  if(m.final_review){
+    const f=m.final_review,s=stage(w,'반성과 교훈 · '+f.score+'점 (연결 '+f.continuity+')',true);
+    if(f.summary)s.appendChild(el('div',null,f.summary));
+    if(f.problems&&f.problems.length){s.appendChild(el('h4',null,'아쉬운 점'));list(s,f.problems)}
+    if(f.lessons&&f.lessons.length){s.appendChild(el('h4',null,'다음 영상에 반영할 교훈'));list(s,f.lessons)}
+  }
+  return w;
+}
+function card(it){
+  const item=el('div','item');item.id=it.id;
+  const c=el('div','card');
+  const v=document.createElement('video');
+  v.controls=true;v.preload='none';v.playsInline=true;v.poster=it.poster;v.src=it.video;
+  v.addEventListener('play',()=>document.querySelectorAll('video').forEach(o=>{if(o!==v)o.pause()}));
+  c.appendChild(v);
+  const b=el('div','body');
+  const mk0=it.making||{},tot=(mk0.board&&mk0.board.clips||[]).length,done=(mk0.clip_reviews||[]).length;
+  b.appendChild(mk0.partial?el('div','badge part','미완성 · 클립 '+done+'/'+tot+'개만 생성'):el('div','badge ok','완성'+(tot?' · 클립 '+tot+'개':'')));
+  b.appendChild(el('div','title',it.title));
+  b.appendChild(el('div','meta',it.ts.replace('T',' ').slice(0,16)+' · '+it.category));
+  if(it.caption)b.appendChild(el('div','cap',it.caption));
+  const row=el('div','row');
+  const dl=el('a','btn','다운로드');dl.href=it.video;dl.download=it.id+'.mp4';
+  const cp=el('button','btn','링크 복사');cp.type='button';
+  cp.onclick=()=>copy(abs(it.video));
+  row.append(dl,cp);b.appendChild(row);c.appendChild(b);
+  item.appendChild(c);
+  if(it.making){const mw=el('div','mkwrap');mw.appendChild(el('div','mkhead','메이킹 과정 · 오른쪽으로 넘겨 보세요'));mw.appendChild(making(it.making));item.appendChild(mw)}
+  return item;
+}
+function render(){
+  grid.replaceChildren();
+  const pages=Math.max(1,Math.ceil(items.length/PER));
+  page=Math.min(Math.max(1,page),pages);
+  if(!items.length){grid.appendChild(el('div','empty','아직 영상이 없습니다'))}
+  items.slice((page-1)*PER,page*PER).forEach(it=>grid.appendChild(card(it)));
+  pager.replaceChildren();
+  if(pages>1){
+    const prev=el('button','btn','이전');prev.disabled=page<=1;prev.onclick=()=>go(page-1);
+    const next=el('button','btn','다음');next.disabled=page>=pages;next.onclick=()=>go(page+1);
+    pager.append(prev,el('span','meta',page+' / '+pages),next);
+  }
+}
+function go(p){page=p;history.replaceState(null,'','?page='+p);render();window.scrollTo(0,0)}
+
+const STEPS=[['backend','영상 서비스 선택'],['collect','자료 수집'],['topics','소재 선정'],['storyboard','콘티 확정'],['profile_image','프로필 이미지'],['keyframe_image','키프레임 이미지'],['frames','클립별 시작 프레임'],['scripts','대본'],['clips','클립 생성·검토'],['assemble','영상 합치기'],['reflect','반성과 교훈'],['publish','발행']];
+const liveEl=document.getElementById('live');
+let liveRun=null,liveState={},liveNote='',liveTs=0,reloadTimer=null,liveMaking={},liveSig='',liveScroll=0;
+function renderLive(){
+  const started=Object.keys(liveState).length>0;
+  const fresh=liveTs&&Date.now()-new Date(liveTs)<4*3600*1000;
+  if(!started||!fresh||liveState.publish==='done'&&!reloadTimer){liveEl.hidden=true;return}
+  const old=liveEl.querySelector('.mk');if(old)liveScroll=old.scrollLeft;
+  liveEl.hidden=false;liveEl.replaceChildren();
+  liveEl.appendChild(el('h3',null,'지금 제작 중인 영상'));
+  const ol=el('ol');
+  STEPS.forEach(([k,t])=>{const s=liveState[k];const li=el('li',s==='running'?'run':s==='done'?'done':s==='failed'?'failed':'',t+(s==='running'?' …':s==='done'?' ✓':s==='failed'?' ✗':''));ol.appendChild(li)});
+  liveEl.appendChild(ol);
+  if(liveNote)liveEl.appendChild(el('div','note',liveNote));
+  if(liveMaking&&(liveMaking.topic||liveMaking.board)){const mk=making(liveMaking);liveEl.appendChild(mk);mk.scrollLeft=liveScroll}
+}
+let lastRun='';
+function pollLive(){
+  fetch('data/progress.json?_='+Date.now(),{cache:'no-store'}).then(r=>r.ok?r.json():null).then(d=>{
+    if(!d||!d.steps){liveEl.hidden=true;return}
+    liveState=d.steps;liveNote=d.note||'';liveTs=d.updated||'';liveMaking=d.making||{};
+    if(liveState.publish==='done'){
+      if(lastRun&&lastRun===d.run_id)setTimeout(()=>location.reload(),3000);
+      liveEl.hidden=true;return;
+    }
+    lastRun=d.run_id;
+    const sig=JSON.stringify([d.steps,d.note,d.making]);if(sig===liveSig)return;liveSig=sig;renderLive();
+  }).catch(()=>{liveEl.hidden=true});
+}
+function startLive(){pollLive();setInterval(pollLive,15000)}
+startLive();
+fetch('data/videos.json',{cache:'no-cache'}).then(r=>r.json()).then(d=>{
+  items=d.sort((a,b)=>b.ts.localeCompare(a.ts));
+  page=parseInt(new URLSearchParams(location.search).get('page')||'1',10)||1;
+  render();
+}).catch(()=>{grid.appendChild(el('div','empty','목록을 불러오지 못했습니다'))});
+</script>
+</body>
+</html>
