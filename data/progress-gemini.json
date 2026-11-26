@@ -1,1 +1,1 @@
-{"backend": "gemini", "run_id": "20261126-094424", "steps": {"backend": "done", "collect": "done", "topics": "done", "storyboard": "running"}, "note": "flow check: qwen=0.08/0", "updated": "2026-11-26T10:03:04+09:00", "making": {}}
+{"backend": "gemini", "run_id": "20261126-094424", "steps": {"backend": "done", "collect": "done", "topics": "done", "storyboard": "done"}, "note": "storyboard: 2026 AFPK 자격시험 개편, 핵심만 잡고 준비하는 법 by qwen tally=[1]", "updated": "2026-11-26T10:03:09+09:00", "making": {}}
