@@ -3,6 +3,8 @@ name: daily
 on:
   repository_dispatch:
     types: [dayclp-daily]
+  schedule:
+    - cron: '17 */3 * * *'
   workflow_dispatch:
     inputs:
       stop_after:
@@ -38,9 +40,23 @@ jobs:
     steps:
       - id: m
         env:
+          GH_TOKEN: ${{ github.token }}
           B: ${{ inputs.backend }}
           REGEN: ${{ inputs.regenerate }}
+          EVENT: ${{ github.event_name }}
         run: |
+          if [ "$EVENT" = "schedule" ]; then
+            found=""
+            for b in gemini flow qwen; do
+              n=$(gh api "repos/${GITHUB_REPOSITORY}/actions/artifacts?name=dayclp-paused-${b}&per_page=10" --jq '[.artifacts[] | select(.expired == false)] | length' || echo 0)
+              if [ "${n:-0}" -gt 0 ]; then found="$found $b"; fi
+            done
+            list="["
+            for b in $found; do list="$list\"$b\","; done
+            list="${list%,}]"
+            echo "list=$list" >> "$GITHUB_OUTPUT"
+            exit 0
+          fi
           if [ -n "$REGEN" ] && [ -z "$B" ]; then
             echo "regenerate needs a backend"
             exit 1
@@ -53,6 +69,7 @@ jobs:
 
   run:
     needs: plan
+    if: ${{ needs.plan.outputs.list != '[]' }}
     runs-on: ubuntu-latest
     timeout-minutes: 345
     strategy:
@@ -111,6 +128,7 @@ jobs:
           fi
       - name: Run
         id: run
+        if: ${{ github.event_name != 'schedule' || env.DAYCLP_RESUME_DIR != '' }}
         working-directory: src
         env:
           WA_BASE: ${{ secrets.WA_BASE }}
