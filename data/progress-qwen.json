@@ -1,1 +1,1 @@
-{"backend": "qwen", "run_id": "20261128-060104", "steps": {"backend": "done", "collect": "done", "topics": "done", "storyboard": "done", "profile_image": "done", "keyframe_image": "done", "frames": "done"}, "note": "", "updated": "2026-11-28T06:01:32+09:00", "making": {}}
+{"backend": "qwen", "run_id": "20261128-060104", "steps": {"backend": "done", "collect": "done", "topics": "done", "storyboard": "done", "profile_image": "done", "keyframe_image": "done", "frames": "done", "scripts": "done"}, "note": "", "updated": "2026-11-28T06:01:33+09:00", "making": {}}
