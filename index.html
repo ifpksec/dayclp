@@ -124,6 +124,7 @@ function making(m){
   if(m.regen_changes){const s=stage(w,'시나리오 보완'+(m.regen_round?' · '+m.regen_round+'회차':''));s.appendChild(el('div',null,m.regen_changes))}
   if(m.profile_image){const s=stage(w,'3. 프로필 시트'+(m.profile_service?' · '+m.profile_service:''),true);pic(s,m.profile_image,'프로필')}
   if(m.keyframe_image){const s=stage(w,'4. 키프레임 시트'+(m.keyframe_service?' · '+m.keyframe_service:''),true);pic(s,m.keyframe_image,'키프레임')}
+  if(m.overlay_images&&m.overlay_images.length){const s=stage(w,'5. 오버레이 그래픽',true);m.overlay_images.forEach(o=>{pic(s,o.img,'오버레이 '+o.n);s.appendChild(el('div','mut','클립 '+o.n+(o.kind?' · '+o.kind:'')+' · '+(o.lines||[]).join(' / ')))})}
   if(m.board){
     m.board.clips.forEach((c,k)=>{
       const s=stage(w,'클립 '+c.n+(k===0&&m.script_service?' · 대본 '+m.script_service:''),true);
@@ -204,7 +205,7 @@ function render(){
 }
 function go(p){page=p;history.replaceState(null,'','?page='+p);render();window.scrollTo(0,0)}
 
-const STEPS=[['backend','영상 서비스 선택'],['collect','자료 수집'],['topics','소재 선정'],['storyboard','콘티 확정'],['refine','시나리오 보완'],['profile_image','프로필 이미지'],['keyframe_image','키프레임 이미지'],['frames','클립별 시작 프레임'],['scripts','대본'],['clips','클립 생성·검토'],['assemble','영상 합치기'],['reflect','반성과 교훈'],['publish','발행']];
+const STEPS=[['backend','영상 서비스 선택'],['collect','자료 수집'],['topics','소재 선정'],['storyboard','콘티 확정'],['refine','시나리오 보완'],['profile_image','프로필 이미지'],['keyframe_image','키프레임 이미지'],['frames','클립별 시작 프레임'],['scripts','대본'],['overlays','오버레이 그래픽'],['clips','클립 생성·검토'],['assemble','영상 합치기'],['reflect','반성과 교훈'],['publish','발행']];
 const liveEl=document.getElementById('live');
 const BACKENDS=[['gemini','Gemini'],['flow','Flow'],['qwen','Qwen'],['auto','자동 선택'],['','']];
 const liveData={};let liveSig='',lastRuns={},reloadTimer=null;
