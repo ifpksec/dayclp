@@ -133,6 +133,9 @@ jobs:
           if [ -f "$RUNNER_TEMP/work/paused.flag" ]; then
             echo "keep=true" >> "$GITHUB_OUTPUT"
             echo "paused=true" >> "$GITHUB_OUTPUT"
+          elif [ -f "$RUNNER_TEMP/work/regen_failed.flag" ]; then
+            echo "keep=false" >> "$GITHUB_OUTPUT"
+            echo "paused=false" >> "$GITHUB_OUTPUT"
           elif [ "${{ steps.run.outcome }}" != "success" ] && [ -f "$RUNNER_TEMP/work/checkpoint.json" ]; then
             echo "keep=true" >> "$GITHUB_OUTPUT"
             echo "paused=false" >> "$GITHUB_OUTPUT"
