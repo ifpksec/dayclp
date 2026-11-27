@@ -21,6 +21,10 @@ on:
         description: topics to avoid, separated by |
         required: false
         default: ''
+      regenerate:
+        description: gallery video id to regenerate from its scenario and reviews (needs backend)
+        required: false
+        default: ''
 
 permissions:
   contents: write
@@ -33,8 +37,14 @@ jobs:
       list: ${{ steps.m.outputs.list }}
     steps:
       - id: m
+        env:
+          B: ${{ inputs.backend }}
+          REGEN: ${{ inputs.regenerate }}
         run: |
-          B="${{ inputs.backend }}"
+          if [ -n "$REGEN" ] && [ -z "$B" ]; then
+            echo "regenerate needs a backend"
+            exit 1
+          fi
           if [ -n "$B" ]; then
             echo "list=[\"$B\"]" >> "$GITHUB_OUTPUT"
           else
@@ -82,11 +92,17 @@ jobs:
           pip install -q -r src/requirements.txt
       - name: Find unfinished session
         if: ${{ inputs.stop_after == '' }}
+        env:
+          REGEN: ${{ inputs.regenerate }}
         run: |
           row=$(gh api "repos/${GITHUB_REPOSITORY}/actions/artifacts?name=${PAUSED_NAME}&per_page=20" --jq '[.artifacts[] | select(.expired == false)] | sort_by(.created_at) | last | select(. != null) | "\(.id) \(.workflow_run.id)"' || true)
           if [ -n "$row" ]; then
             aid="${row% *}"; rid="${row#* }"
             mkdir -p "$RUNNER_TEMP/resume"
+            if [ -n "$REGEN" ]; then
+              echo "an unfinished ${{ matrix.backend }} session is waiting, it has to finish before a regeneration can start"
+              exit 1
+            fi
             if gh run download "$rid" -n "$PAUSED_NAME" -D "$RUNNER_TEMP/resume" -R "$GITHUB_REPOSITORY"; then
               echo "DAYCLP_RESUME_DIR=$RUNNER_TEMP/resume" >> "$GITHUB_ENV"
               echo "OLD_PAUSED_ID=$aid" >> "$GITHUB_ENV"
@@ -104,6 +120,7 @@ jobs:
           WORK_DIR: ${{ runner.temp }}/work
           DAYCLP_STOP_AFTER: ${{ inputs.stop_after }}
           DAYCLP_AVOID: ${{ inputs.avoid }}
+          DAYCLP_REGENERATE: ${{ inputs.regenerate }}
           DAYCLP_CLIPS: ${{ inputs.clips }}
           DAYCLP_VIDEO_BACKEND: ${{ matrix.backend }}
         run: |
