@@ -1,1 +1,1 @@
-{"backend": "flow", "run_id": "20261127-135110", "steps": {"backend": "done", "collect": "done", "topics": "done", "storyboard": "done", "refine": "running"}, "note": "", "updated": "2026-11-27T13:51:18+09:00", "making": {}}
+{"backend": "flow", "run_id": "20261127-135110", "steps": {"backend": "done", "collect": "done", "topics": "done", "storyboard": "done", "refine": "done"}, "note": "scenario refined by gemini", "updated": "2026-11-27T13:51:42+09:00", "making": {}}
