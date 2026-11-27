@@ -121,6 +121,7 @@ function making(m){
     if(m.board_candidates)list(s,m.board_candidates.map(c=>c.votes+'표 · '+c.title+(c.by?' ('+c.by+')':'')));
     if(m.board.characters&&m.board.characters.length){s.appendChild(el('h4',null,'등장인물'));list(s,m.board.characters.map(x=>x.name+': '+x.desc))}
   }
+  if(m.regen_changes){const s=stage(w,'시나리오 보완'+(m.regen_round?' · '+m.regen_round+'회차':''));s.appendChild(el('div',null,m.regen_changes))}
   if(m.profile_image){const s=stage(w,'3. 프로필 시트'+(m.profile_service?' · '+m.profile_service:''),true);pic(s,m.profile_image,'프로필')}
   if(m.keyframe_image){const s=stage(w,'4. 키프레임 시트'+(m.keyframe_service?' · '+m.keyframe_service:''),true);pic(s,m.keyframe_image,'키프레임')}
   if(m.board){
@@ -142,6 +143,25 @@ function making(m){
   }
   return w;
 }
+const REPO='ifpksec/dayclp';
+function ghToken(){try{return localStorage.getItem('dayclp_gh')||''}catch(e){return ''}}
+function setGhToken(t){try{if(t)localStorage.setItem('dayclp_gh',t);else localStorage.removeItem('dayclp_gh')}catch(e){}}
+async function regenerate(it,btn){
+  const be=(it.making||{}).video_backend;
+  const live=liveData[be];
+  if(live&&live.steps&&live.steps.publish!=='done'&&live.updated&&Date.now()-new Date(live.updated)<30*3600*1000){alert('이 서비스로 만들고 있는 영상이 아직 끝나지 않았습니다. 끝난 뒤 다시 눌러 주세요.');return}
+  if(!confirm('이 영상의 시나리오와 감독 검토를 바탕으로 보완해서 다시 만듭니다.\n영상 사용량이 쓰이고, 새 영상이 갤러리에 추가됩니다(원본은 그대로 남습니다).\n시작할까요?'))return;
+  let t=ghToken();
+  if(!t){t=(prompt('GitHub 토큰을 한 번만 붙여 넣어 주세요(ifpksec/dayclp 저장소의 Actions 읽기·쓰기 권한). 이 브라우저에만 저장됩니다.')||'').trim();if(!t)return;setGhToken(t)}
+  btn.disabled=true;const old=btn.textContent;btn.textContent='요청 중…';
+  try{
+    const r=await fetch('https://api.github.com/repos/'+REPO+'/actions/workflows/daily.yml/dispatches',{method:'POST',headers:{'Authorization':'Bearer '+t,'Accept':'application/vnd.github+json','X-GitHub-Api-Version':'2022-11-28','Content-Type':'application/json'},body:JSON.stringify({ref:'main',inputs:{backend:be,regenerate:it.id}})});
+    if(r.status===204){btn.textContent='재생성 시작됨';setTimeout(pollLive,20000);setTimeout(pollLive,60000);return}
+    if(r.status===401||r.status===403||r.status===404){setGhToken('');alert('토큰이 거절되었습니다. 권한을 확인하고 다시 눌러 새 토큰을 입력해 주세요.')}
+    else alert('시작하지 못했습니다 (오류 '+r.status+')');
+  }catch(e){alert('GitHub 에 연결하지 못했습니다.')}
+  btn.disabled=false;btn.textContent=old;
+}
 function card(it){
   const item=el('div','item');item.id=it.id;
   const c=el('div','card');
@@ -151,7 +171,7 @@ function card(it){
   c.appendChild(v);
   const b=el('div','body');
   const mk0=it.making||{},tot=(mk0.board&&mk0.board.clips||[]).length,done=(mk0.clip_reviews||[]).length;
-  b.appendChild(mk0.partial?el('div','badge part','미완성 · 클립 '+done+'/'+tot+'개만 생성'):el('div','badge ok','완성'+(tot?' · 클립 '+tot+'개':'')));
+  b.appendChild(mk0.partial?el('div','badge part','미완성 · 클립 '+done+'/'+tot+'개만 생성'):el('div','badge ok','완성'+(tot?' · 클립 '+tot+'개':'')+(mk0.regenerated_from?' · 재생성 '+(mk0.regen_round||1)+'회차':'')));
   b.appendChild(el('div','title',it.title));
   b.appendChild(el('div','meta',it.ts.replace('T',' ').slice(0,16)+' · '+it.category));
   if(it.caption)b.appendChild(el('div','cap',it.caption));
@@ -159,7 +179,12 @@ function card(it){
   const dl=el('a','btn','다운로드');dl.href=it.video;dl.download=it.id+'.mp4';
   const cp=el('button','btn','링크 복사');cp.type='button';
   cp.onclick=()=>copy(abs(it.video));
-  row.append(dl,cp);b.appendChild(row);c.appendChild(b);
+  row.append(dl);
+  if(mk0.board&&mk0.keyframe_image&&mk0.video_backend){
+    const rg=el('button','btn','재생성');rg.type='button';rg.title='이 영상의 시나리오와 감독 검토를 바탕으로 완성도를 높여 다시 만듭니다';
+    rg.onclick=()=>regenerate(it,rg);row.append(rg);
+  }
+  row.append(cp);b.appendChild(row);c.appendChild(b);
   item.appendChild(c);
   if(it.making){const mw=el('div','mkwrap');mw.appendChild(el('div','mkhead','메이킹 과정 · 오른쪽으로 넘겨 보세요'));mw.appendChild(making(it.making));item.appendChild(mw)}
   return item;
@@ -179,7 +204,7 @@ function render(){
 }
 function go(p){page=p;history.replaceState(null,'','?page='+p);render();window.scrollTo(0,0)}
 
-const STEPS=[['backend','영상 서비스 선택'],['collect','자료 수집'],['topics','소재 선정'],['storyboard','콘티 확정'],['profile_image','프로필 이미지'],['keyframe_image','키프레임 이미지'],['frames','클립별 시작 프레임'],['scripts','대본'],['clips','클립 생성·검토'],['assemble','영상 합치기'],['reflect','반성과 교훈'],['publish','발행']];
+const STEPS=[['backend','영상 서비스 선택'],['collect','자료 수집'],['topics','소재 선정'],['storyboard','콘티 확정'],['refine','시나리오 보완'],['profile_image','프로필 이미지'],['keyframe_image','키프레임 이미지'],['frames','클립별 시작 프레임'],['scripts','대본'],['clips','클립 생성·검토'],['assemble','영상 합치기'],['reflect','반성과 교훈'],['publish','발행']];
 const liveEl=document.getElementById('live');
 const BACKENDS=[['gemini','Gemini'],['flow','Flow'],['qwen','Qwen'],['auto','자동 선택'],['','']];
 const liveData={};let liveSig='',lastRuns={},reloadTimer=null;
@@ -198,7 +223,7 @@ function renderLive(){
     const paused=Object.values(d.steps).includes('paused');
     box.appendChild(el('h4',null,(t?t+' · ':'')+(paused?'사용량 한도로 대기 중 — 다음 실행에서 이어서 완성합니다':'진행 중')));
     const ol=el('ol');
-    STEPS.forEach(([sk,st])=>{const s=d.steps[sk];const li=el('li',s==='running'?'run':s==='done'?'done':s==='failed'?'failed':s==='paused'?'run':'',st+(s==='running'?' …':s==='done'?' ✓':s==='failed'?' ✗':s==='paused'?' ⏸':''));ol.appendChild(li)});
+    STEPS.forEach(([sk,st])=>{if(sk==='refine'&&!d.steps.refine)return;const s=d.steps[sk];const li=el('li',s==='running'?'run':s==='done'?'done':s==='failed'?'failed':s==='paused'?'run':'',st+(s==='running'?' …':s==='done'?' ✓':s==='failed'?' ✗':s==='paused'?' ⏸':''));ol.appendChild(li)});
     box.appendChild(ol);
     if(d.note)box.appendChild(el('div','note',d.note));
     const mkd=d.making||{};
